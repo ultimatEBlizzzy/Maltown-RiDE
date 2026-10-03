@@ -80,23 +80,25 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 border-t border-white/10 pt-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Development demo accounts
-            </p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {DEMO_ACCOUNTS.map((a) => (
-                <button
-                  key={a.email}
-                  type="button"
-                  onClick={() => submit(undefined, { email: a.email, password: a.password })}
-                  className="rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs font-semibold text-slate-300 hover:border-pulse-500/40 hover:bg-pulse-500/10 hover:text-pulse-300"
-                >
-                  {a.label}
-                </button>
-              ))}
+          {process.env.NODE_ENV !== "production" ? (
+            <div className="mt-6 border-t border-white/10 pt-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Development demo accounts
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {DEMO_ACCOUNTS.map((a) => (
+                  <button
+                    key={a.email}
+                    type="button"
+                    onClick={() => submit(undefined, { email: a.email, password: a.password })}
+                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-2 text-xs font-semibold text-slate-300 hover:border-pulse-500/40 hover:bg-pulse-500/10 hover:text-pulse-300"
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <p className="mt-6 text-center text-sm text-slate-400">
             New here?{" "}
