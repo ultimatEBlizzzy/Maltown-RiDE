@@ -1,0 +1,46 @@
+# MALTown RiDE — infrastructure for local development / self-hosting.
+#
+# NOTE: In this workspace the platform runtime manages PostgreSQL for you.
+# This compose file is provided so the stack can be stood up anywhere:
+#   docker compose up -d
+# then:
+#   npx drizzle-kit push && npx tsx src/db/seed.ts
+#
+# PostgreSQL runs the PostGIS-capable image so spatial upgrades (geography
+# columns + GIST indexes) can be enabled without changing the stack.
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: maltown-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: maltown_ride
+    ports:
+      - "5432:5432"
+    volumes:
+      - maltown_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d maltown_ride"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: maltown-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - maltown_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  maltown_pgdata:
+  maltown_redisdata:
