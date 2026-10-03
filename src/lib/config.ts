@@ -42,7 +42,10 @@ export const config = {
   },
 
   routing: {
-    osrmBaseUrl: (process.env.OSRM_BASE_URL || "").replace(/\/$/, ""),
+    osrmBaseUrl: (
+      process.env.OSRM_BASE_URL ??
+      (process.env.NODE_ENV === "production" ? "https://router.project-osrm.org" : "")
+    ).replace(/\/$/, ""),
     roadFactor: num("ROUTING_ROAD_FACTOR", 1.3),
   },
 
