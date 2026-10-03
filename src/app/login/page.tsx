@@ -106,6 +106,10 @@ export default function LoginPage() {
               Create an account
             </Link>
           </p>
+          <p className="mt-3 text-center text-xs text-slate-500">
+            First admin for this deployment?{" "}
+            <Link href="/admin/setup" className="font-semibold text-nova-300 hover:text-nova-200">Secure setup</Link>
+          </p>
         </GlassCard>
       </div>
     </main>

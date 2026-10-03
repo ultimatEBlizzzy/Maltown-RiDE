@@ -113,6 +113,10 @@ bash scripts/e2e-acceptance.sh   # full 26-step acceptance flow
 
 The included Blueprint is a **free preview**: the web service may sleep when idle, and Render deletes free PostgreSQL databases 30 days after creation (after a further 14-day upgrade grace period). Upgrade the database to a paid plan before storing important or long-lived user data. Free web services do not support Render pre-deploy commands, so this preview applies migrations during its build; for a paid production web service, move `npm run db:migrate` from `buildCommand` to `preDeployCommand` in `render.yaml`.
 
+#### Initial administrator access
+
+Public registration never accepts the `ADMIN` role. The Render Blueprint generates a secret `ADMIN_BOOTSTRAP_TOKEN`; after syncing the Blueprint and deploying, copy that value from the Render service's Environment page and open `/admin/setup`. The form creates the first admin and signs them in. The endpoint is transaction-locked and permanently returns a conflict once an admin exists. Remove or rotate the bootstrap token in Render after setup.
+
 ### Seeded development credentials (DEV ONLY — never reuse)
 
 | Role | Email | Password |

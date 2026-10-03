@@ -35,7 +35,8 @@ export async function api<T>(
       res.status === 401 &&
       typeof window !== "undefined" &&
       !window.location.pathname.startsWith("/login") &&
-      !window.location.pathname.startsWith("/register")
+      !window.location.pathname.startsWith("/register") &&
+      !window.location.pathname.startsWith("/admin/setup")
     ) {
       window.location.href = "/login";
     }

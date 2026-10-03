@@ -18,6 +18,8 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
+      - key: ADMIN_BOOTSTRAP_TOKEN
+        generateValue: true
       - key: FARE_BASE
         value: 15
       - key: FARE_PER_KM
