@@ -26,6 +26,13 @@ export const registerSchema = z.object({
       vehicleType: z.enum(["SEDAN", "HATCHBACK", "SUV", "MINIBUS", "MOTO"]),
     })
     .optional(),
+}).superRefine((input, ctx) => {
+  if (input.role === "DRIVER" && !input.licenseNumber) {
+    ctx.addIssue({ code: "custom", path: ["licenseNumber"], message: "Licence number is required for drivers" });
+  }
+  if (input.role === "DRIVER" && !input.vehicle) {
+    ctx.addIssue({ code: "custom", path: ["vehicle"], message: "Vehicle details are required for drivers" });
+  }
 });
 
 export const loginSchema = z.object({

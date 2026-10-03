@@ -6,6 +6,8 @@ import { Suspense, useState, type FormEvent } from "react";
 import { Button, Field, GlassCard, SelectField, toast, Toaster } from "@/components/ui";
 import { roleHome } from "@/hooks/useUser";
 import { api } from "@/lib/api-client";
+import { VehicleArtwork } from "@/components/vehicle-artwork";
+import { VEHICLE_CATALOG, VEHICLE_COLORS } from "@/lib/vehicle-catalog";
 import type { UserDto, UserRole } from "@/lib/types";
 
 function RegisterForm() {
@@ -16,19 +18,34 @@ function RegisterForm() {
   const [role, setRole] = useState<UserRole>(initialRole);
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [licenseNumber, setLicenseNumber] = useState("");
+  const initialMake = VEHICLE_CATALOG[0];
+  const initialModel = initialMake.models[1];
   const [vehicle, setVehicle] = useState({
-    make: "",
-    model: "",
+    make: initialMake.make,
+    model: initialModel.name,
     year: new Date().getFullYear() - 4,
-    color: "",
+    color: "White",
     registration: "",
-    vehicleType: "SEDAN" as "SEDAN" | "HATCHBACK" | "SUV" | "MINIBUS" | "MOTO",
+    vehicleType: initialModel.vehicleType,
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
+  const selectedMake = VEHICLE_CATALOG.find((option) => option.make === vehicle.make) ?? initialMake;
+
+  function selectMake(make: string) {
+    const option = VEHICLE_CATALOG.find((entry) => entry.make === make) ?? initialMake;
+    const firstModel = option.models[0];
+    setVehicle((current) => ({ ...current, make: option.make, model: firstModel.name, vehicleType: firstModel.vehicleType }));
+  }
+
+  function selectModel(modelName: string) {
+    const option = selectedMake.models.find((entry) => entry.name === modelName);
+    if (!option) return;
+    setVehicle((current) => ({ ...current, model: option.name, vehicleType: option.vehicleType }));
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -95,23 +112,24 @@ function RegisterForm() {
             {role === "DRIVER" ? (
               <div className="space-y-4 rounded-xl border border-nova-500/20 bg-nova-500/5 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-nova-300">Driver & vehicle details</p>
-                <Field label="Licence number" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} placeholder="DL-12345" />
+                <Field label="Licence number" required value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} placeholder="DL-12345" />
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Vehicle make" required value={vehicle.make} onChange={(e) => setVehicle((v) => ({ ...v, make: e.target.value }))} placeholder="Toyota" />
-                  <Field label="Vehicle model" required value={vehicle.model} onChange={(e) => setVehicle((v) => ({ ...v, model: e.target.value }))} placeholder="Corolla" />
+                  <SelectField label="Vehicle make" value={vehicle.make} onChange={(e) => selectMake(e.target.value)}>
+                    {VEHICLE_CATALOG.map((option) => <option key={option.make} value={option.make}>{option.make}</option>)}
+                  </SelectField>
+                  <SelectField label="Vehicle model" value={vehicle.model} onChange={(e) => selectModel(e.target.value)}>
+                    {selectedMake.models.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}
+                  </SelectField>
                   <Field label="Year" type="number" required min={1990} max={new Date().getFullYear() + 1} value={vehicle.year} onChange={(e) => setVehicle((v) => ({ ...v, year: Number(e.target.value) }))} />
-                  <Field label="Colour" required value={vehicle.color} onChange={(e) => setVehicle((v) => ({ ...v, color: e.target.value }))} placeholder="Silver" />
+                  <SelectField label="Colour" value={vehicle.color} onChange={(e) => setVehicle((v) => ({ ...v, color: e.target.value }))}>
+                    {VEHICLE_COLORS.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}
+                  </SelectField>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Registration" required value={vehicle.registration} onChange={(e) => setVehicle((v) => ({ ...v, registration: e.target.value }))} placeholder="LIM 123 L" />
-                  <SelectField label="Vehicle type" value={vehicle.vehicleType} onChange={(e) => setVehicle((v) => ({ ...v, vehicleType: e.target.value as typeof v.vehicleType }))}>
-                    <option value="SEDAN">Sedan (RiDE Go)</option>
-                    <option value="HATCHBACK">Hatchback (RiDE Go)</option>
-                    <option value="SUV">SUV (RiDE Comfort)</option>
-                    <option value="MINIBUS">Minibus (RiDE Comfort)</option>
-                    <option value="MOTO">Motorbike (RiDE Moto)</option>
-                  </SelectField>
+                  <p className="flex items-end pb-2 text-xs text-slate-400">Vehicle class is set automatically from the selected model.</p>
                 </div>
+                <VehicleArtwork {...vehicle} compact={false} />
               </div>
             ) : null}
 

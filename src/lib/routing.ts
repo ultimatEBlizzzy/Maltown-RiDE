@@ -1,5 +1,5 @@
 import { config } from "./config";
-import { haversineKm, interpolate } from "./geo";
+import { haversineKm } from "./geo";
 import type { LatLng } from "./types";
 
 export interface RouteResult {
@@ -21,8 +21,8 @@ export interface RoutingProvider {
 
 /**
  * Development provider: great-circle distance corrected by a road factor,
- * duration from a configurable average urban speed, synthetic geometry with
- * a gentle arc so route lines look natural on the map.
+ * duration from a configurable average urban speed. It intentionally returns
+ * no route geometry: a synthetic line must never be presented as a road route.
  */
 export class MockRoutingProvider implements RoutingProvider {
   readonly name = "mock";
@@ -32,20 +32,7 @@ export class MockRoutingProvider implements RoutingProvider {
     const distanceKm = Math.max(0.3, straight * config.routing.roadFactor);
     const durationMin = Math.max(2, (distanceKm / config.matching.avgSpeedKmh) * 60);
 
-    const points: [number, number][] = [];
-    const segments = 18;
-    // Perpendicular offset creates a believable street-like arc.
-    const bow = Math.min(0.0012, straight * 0.00012);
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-      const p = interpolate(from, to, t);
-      const offset = Math.sin(Math.PI * t) * bow;
-      points.push([
-        Number((p.lat + offset * 0.8).toFixed(6)),
-        Number((p.lng - offset).toFixed(6)),
-      ]);
-    }
-    return { distanceKm: Number(distanceKm.toFixed(2)), durationMin: Number(durationMin.toFixed(1)), geometry: points };
+    return { distanceKm: Number(distanceKm.toFixed(2)), durationMin: Number(durationMin.toFixed(1)), geometry: [] };
   }
 }
 
@@ -55,7 +42,7 @@ export class OsrmRoutingProvider implements RoutingProvider {
   constructor(private baseUrl: string) {}
 
   async route(from: LatLng, to: LatLng): Promise<RouteResult> {
-    const url = `${this.baseUrl}/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+    const url = `${this.baseUrl}/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?alternatives=true&overview=full&geometries=geojson`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     try {
@@ -66,7 +53,7 @@ export class OsrmRoutingProvider implements RoutingProvider {
         routes?: Array<{ distance: number; duration: number; geometry: { coordinates: [number, number][] } }>;
       };
       if (data.code !== "Ok" || !data.routes?.length) throw new Error("OSRM: no route");
-      const best = data.routes[0];
+      const best = data.routes.reduce((shortest, route) => route.distance < shortest.distance ? route : shortest);
       return {
         distanceKm: Number((best.distance / 1000).toFixed(2)),
         durationMin: Number((best.duration / 60).toFixed(1)),

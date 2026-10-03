@@ -19,7 +19,8 @@ import {
 import { usePoll } from "@/hooks/usePoll";
 import { useUser } from "@/hooks/useUser";
 import { api } from "@/lib/api-client";
-import { bearingDeg, haversineKm, moveTowards } from "@/lib/geo";
+import { advanceAlongPolyline, nearestPolylineIndex } from "@/lib/geo";
+import { useVehicleImage } from "@/hooks/useVehicleImage";
 import { MARKET_CENTER } from "@/lib/market";
 import {
   formatZAR,
@@ -29,6 +30,7 @@ import {
   type UserDto,
   type VehicleDto,
 } from "@/lib/types";
+import { VehicleArtwork } from "@/components/vehicle-artwork";
 
 const MapView = dynamic(() => import("@/components/MapView"), {
   ssr: false,
@@ -41,6 +43,8 @@ type MapMarkerSpec = {
   kind: "driver" | "pickup" | "destination" | "user";
   heading?: number;
   idle?: boolean;
+  vehicle?: VehicleDto;
+  vehicleImageUrl?: string;
 };
 
 /** Development fallback point: Malamulele town centre. */
@@ -115,11 +119,13 @@ function DriverApp({
   const [simulate, setSimulate] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [completeSummary, setCompleteSummary] = useState<RideDto | null>(null);
+  const vehiclePhoto = useVehicleImage(vehicle?.make, vehicle?.model);
 
   const rideRef = useRef(ride);
   rideRef.current = ride;
   const posRef = useRef<LatLng | null>(null);
   posRef.current = myPos;
+  const simulationCursorRef = useRef<{ key: string; segmentIndex: number; position: LatLng; finished: boolean } | null>(null);
 
   const visibleRequests = requests.filter((r) => !declined.has(r.rideId));
 
@@ -170,24 +176,29 @@ function DriverApp({
     true,
   );
 
-  /* Simulated drive: move the driver along the road toward the target. */
+  /* Demo-only movement follows the stored road polyline for each leg. */
   usePoll(
     async () => {
       const current = rideRef.current;
       const pos = posRef.current;
       if (!current || !pos) return;
-      if (current.status === "COMPLETED" || current.status === "CANCELLED") return;
-      const target: LatLng =
-        current.status === "IN_PROGRESS"
-          ? { lat: current.destination.lat, lng: current.destination.lng }
-          : { lat: current.pickup.lat, lng: current.pickup.lng };
-      const remaining = haversineKm(pos, target);
-      if (remaining < 0.03) return;
-      const step = Math.max(0.12, remaining * 0.09);
-      const next = moveTowards(pos, target, step);
-      const heading = bearingDeg(pos, next);
-      setMyPos(next);
-      await api("/drivers/location", { body: { lat: next.lat, lng: next.lng, heading } }).catch(() => undefined);
+      if (current.status === "COMPLETED" || current.status === "CANCELLED" || current.status === "DRIVER_ARRIVED") return;
+      const tripLeg = current.status === "IN_PROGRESS";
+      const routeLine = tripLeg ? current.routeLine : current.approachRouteLine;
+      if (!routeLine || routeLine.length < 2) return;
+      const points = routeLine.map(([lat, lng]) => ({ lat, lng }));
+      const routeKey = `${current.id}:${tripLeg ? "trip" : "approach"}:${points.length}`;
+      let cursor = simulationCursorRef.current;
+      if (!cursor || cursor.key !== routeKey) {
+        const segmentIndex = nearestPolylineIndex(pos, points);
+        cursor = { key: routeKey, segmentIndex, position: points[segmentIndex], finished: false };
+      }
+      if (cursor.finished) return;
+      const next = advanceAlongPolyline(points, cursor.segmentIndex, (26 * 2.5) / 3600, cursor.position);
+      if (!next) return;
+      simulationCursorRef.current = { key: routeKey, segmentIndex: next.segmentIndex, position: next.position, finished: next.finished };
+      setMyPos(next.position);
+      await api("/drivers/location", { body: { lat: next.position.lat, lng: next.position.lng, heading: next.heading } }).catch(() => undefined);
     },
     2500,
     simulate && Boolean(ride) && ride?.status !== "COMPLETED",
@@ -281,7 +292,7 @@ function DriverApp({
 
   const markers = useMemo<MapMarkerSpec[]>(() => {
     const list: MapMarkerSpec[] = [];
-    if (myPos) list.push({ id: "me", lat: myPos.lat, lng: myPos.lng, kind: "driver", heading: 0 });
+    if (myPos) list.push({ id: "me", lat: myPos.lat, lng: myPos.lng, kind: "driver", heading: 0, vehicle: vehicle ?? undefined, vehicleImageUrl: vehiclePhoto?.url });
     if (ride && ride.status !== "COMPLETED" && ride.status !== "CANCELLED") {
       list.push({ id: "pickup", lat: ride.pickup.lat, lng: ride.pickup.lng, kind: "pickup", heading: 0 });
       list.push({ id: "dest", lat: ride.destination.lat, lng: ride.destination.lng, kind: "destination", heading: 0 });
@@ -291,7 +302,7 @@ function DriverApp({
       list.push({ id: "req-dest", lat: visibleRequests[0].destLat, lng: visibleRequests[0].destLng, kind: "destination", heading: 0 });
     }
     return list;
-  }, [myPos, ride, visibleRequests]);
+  }, [myPos, ride, visibleRequests, vehicle, vehiclePhoto]);
 
   const activeStatus = ride?.status;
 
@@ -302,7 +313,7 @@ function DriverApp({
         <MapView
           center={myPos ?? ride?.driverLocation ?? FALLBACK}
           markers={markers}
-          route={ride?.routeLine ?? null}
+          route={ride ? (ride.status === "IN_PROGRESS" ? ride.routeLine : ride.approachRouteLine) : null}
           fitKey={`${ride?.id ?? "idle"}:${ride?.status ?? ""}`}
         />
       </div>
@@ -329,11 +340,14 @@ function DriverApp({
       >
         {/* availability + stats */}
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="font-display text-lg font-bold text-slate-100">Command center</p>
-            <p className="text-xs text-slate-500">
-              {vehicle ? `${vehicle.color} ${vehicle.make} ${vehicle.model} · ${vehicle.registration}` : "No vehicle on file"}
-            </p>
+          <div className="flex min-w-0 items-center gap-2.5">
+            {vehicle ? <VehicleArtwork {...vehicle} compact /> : null}
+            <div className="min-w-0">
+              <p className="font-display text-lg font-bold text-slate-100">Command center</p>
+              <p className="truncate text-xs text-slate-400">
+                {vehicle ? `${vehicle.color} ${vehicle.make} ${vehicle.model} · ${vehicle.registration}` : "No vehicle on file"}
+              </p>
+            </div>
           </div>
           <button
             role="switch"

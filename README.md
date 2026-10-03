@@ -83,6 +83,7 @@ The sandbox PostgreSQL has **no PostGIS extension**, so locations are `lat/lng d
 - Display currency: South African rand (ZAR).
 - Starter fare settings are editable in `.env`: R15 base, R6/km, R0.80/min, R5 booking fee, and R25 minimum.
 - Driver discovery defaults to a 15 km radius for the surrounding rural service area.
+- The Render preview uses OSRM's public demo router for road geometry. It is suitable for low-volume testing only; use a dedicated routing provider for production traffic.
 
 ## Quick start
 

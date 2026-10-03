@@ -55,6 +55,70 @@ export function moveTowards(from: LatLng, to: LatLng, stepKm: number): LatLng {
   return interpolate(from, to, stepKm / total);
 }
 
+export interface PolylineAdvance {
+  position: LatLng;
+  heading: number;
+  segmentIndex: number;
+  finished: boolean;
+}
+
+/** Find the route point nearest to a GPS position when resuming simulation. */
+export function nearestPolylineIndex(position: LatLng, points: readonly LatLng[]): number {
+  if (points.length < 2) return 0;
+  let closest = 0;
+  let distance = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < points.length; i++) {
+    const candidate = haversineKm(position, points[i]);
+    if (candidate < distance) {
+      closest = i;
+      distance = candidate;
+    }
+  }
+  return closest;
+}
+
+/** Advance by distance along a road polyline without cutting across segments. */
+export function advanceAlongPolyline(
+  points: readonly LatLng[],
+  segmentIndex: number,
+  stepKm: number,
+  currentPosition?: LatLng,
+): PolylineAdvance | null {
+  if (points.length < 2) return null;
+
+  let index = Math.max(0, Math.min(points.length - 1, Math.floor(segmentIndex)));
+  if (index >= points.length - 1) {
+    return { position: points[points.length - 1], heading: bearingDeg(points[index - 1], points[index]), segmentIndex: index, finished: true };
+  }
+  let position = currentPosition ?? points[index];
+  let remaining = Math.max(0, stepKm);
+  let heading = bearingDeg(position, points[index + 1]);
+
+  while (index < points.length - 1) {
+    const next = points[index + 1];
+    const length = haversineKm(position, next);
+    if (length < 0.001) {
+      position = next;
+      index++;
+      if (index >= points.length - 1) break;
+      continue;
+    }
+
+    heading = bearingDeg(position, next);
+    if (remaining >= length) {
+      position = next;
+      remaining -= length;
+      index++;
+      if (remaining === 0) break;
+    } else {
+      position = moveTowards(position, next, remaining);
+      break;
+    }
+  }
+
+  return { position, heading, segmentIndex: Math.min(index, points.length - 1), finished: index >= points.length - 1 };
+}
+
 /** Heading in degrees (0 = north, clockwise) from a to b. */
 export function bearingDeg(a: LatLng, b: LatLng): number {
   const lat1 = toRad(a.lat);

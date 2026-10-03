@@ -8,6 +8,13 @@
       "when": 1791024186724,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791029255713,
+      "tag": "0001_driver_approach_routes",
+      "breakpoints": true
     }
   ]
 }

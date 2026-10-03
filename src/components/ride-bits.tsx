@@ -1,6 +1,7 @@
 "use client";
 
 import { Avatar, Badge, StatusPill } from "@/components/ui";
+import { VehicleArtwork } from "@/components/vehicle-artwork";
 import {
   formatZAR,
   STATUS_META,
@@ -44,6 +45,7 @@ export function DriverInfoPanel({ driver }: { driver: DriverInfoDto }) {
   return (
     <div className="flex items-center gap-3">
       <Avatar name={driver.name} size={52} />
+      {driver.vehicle ? <VehicleArtwork {...driver.vehicle} compact /> : null}
       <div className="min-w-0 flex-1">
         <p className="truncate font-display text-base font-bold text-slate-100">{driver.name}</p>
         <p className="truncate text-xs text-slate-400">{vehicleLine}</p>

@@ -106,6 +106,7 @@ export async function buildRideDto(ride: Ride): Promise<RideDto> {
     driver,
     driverLocation,
     routeLine: ride.routeLine,
+    approachRouteLine: ride.approachRouteLine,
     payment: payment
       ? {
           id: payment.id,
@@ -274,11 +275,29 @@ export async function acceptRide(driver: User, rideId: string): Promise<RideDto>
     .returning();
   await addHistory(rideId, "DRIVER_ARRIVING", "SYSTEM", "Driver heading to pickup");
 
+  const [driverLocation] = await db
+    .select()
+    .from(driverLocations)
+    .where(eq(driverLocations.driverId, profile.id))
+    .limit(1);
+  let rideWithApproach = arriving;
+  if (driverLocation) {
+    const approach = await getRoutingProvider().route(
+      { lat: driverLocation.lat, lng: driverLocation.lng },
+      { lat: ride.pickupLat, lng: ride.pickupLng },
+    );
+    [rideWithApproach] = await db
+      .update(rides)
+      .set({ approachRouteLine: approach.geometry })
+      .where(eq(rides.id, rideId))
+      .returning();
+  }
+
   await notifyUser(ride.riderId, "DRIVER_FOUND", "Driver found", `${driver.name} is on the way in ${vehicleDesc}`, { rideId });
   publishToRide(rideId, "ride_status", { status: "DRIVER_ARRIVING", driverName: driver.name });
   publishToAdmin("ride_accepted", { rideId, driverId: driver.id });
 
-  return buildRideDto(arriving);
+  return buildRideDto(rideWithApproach);
 }
 
 export async function declineRide(driver: User, rideId: string): Promise<void> {

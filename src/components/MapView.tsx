@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
-import type { LatLng } from "@/lib/types";
+import { escapeHtmlAttribute, vehicleColorHex } from "@/lib/vehicle-catalog";
+import type { LatLng, VehicleDto } from "@/lib/types";
 
 export type MarkerKind = "driver" | "pickup" | "destination" | "user";
 
@@ -14,6 +15,8 @@ export interface MapMarkerSpec {
   heading?: number;
   idle?: boolean;
   title?: string;
+  vehicle?: VehicleDto;
+  vehicleImageUrl?: string;
 }
 
 interface MapViewProps {
@@ -38,8 +41,23 @@ const TILE_ATTRIBUTION =
 
 function iconHtml(m: MapMarkerSpec): string {
   switch (m.kind) {
-    case "driver":
-      return `<div class="mk mk-driver ${m.idle ? "mk-driver-idle" : ""}" title="${m.title ?? "Driver"}"><div class="mk-driver-arrow" style="transform:rotate(${m.heading ?? 0}deg)">&#9650;</div></div>`;
+    case "driver": {
+      const label = m.vehicle
+        ? `${m.vehicle.color} ${m.vehicle.make} ${m.vehicle.model}`
+        : m.title ?? "Driver";
+      const title = escapeHtmlAttribute(label);
+      const paint = vehicleColorHex(m.vehicle?.color ?? "Blue");
+      const isMoto = m.vehicle?.vehicleType === "MOTO";
+      const bodyWidth = m.vehicle?.vehicleType === "SUV" || m.vehicle?.vehicleType === "MINIBUS" ? 24 : 19;
+      const left = (36 - bodyWidth) / 2;
+      const clipId = `vehicle-${m.id.replace(/[^a-z0-9_-]/gi, "")}`;
+      const svg = m.vehicleImageUrl
+        ? `<defs><clipPath id="${clipId}"><rect x="3" y="3" width="30" height="30" rx="9"/></clipPath></defs><image href="${escapeHtmlAttribute(m.vehicleImageUrl)}" x="3" y="3" width="30" height="30" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})"/><rect x="3" y="3" width="30" height="30" rx="9" fill="none" stroke="${paint}" stroke-width="3"/>`
+        : isMoto
+        ? `<circle cx="10" cy="7" r="5" fill="none" stroke="#e2e8f0" stroke-width="2"/><circle cx="10" cy="27" r="5" fill="none" stroke="#e2e8f0" stroke-width="2"/><path d="m10 7 4 10-4 10m0-10h11l5-7m-16 7h8" fill="none" stroke="${paint}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`
+        : `<path d="M${left + 5} 2h${bodyWidth - 10}q5 0 6 6l2 4v12l-2 5q-1 5-6 5h-${bodyWidth - 10}q-5 0-6-5l-2-5V12l2-4q1-6 6-6Z" fill="${paint}" stroke="#101827" stroke-width="1.5"/><path d="M${left + 4} 9q${bodyWidth / 2 - 4} -3 ${bodyWidth - 8} 0v6h-${bodyWidth - 8}Zm0 9h${bodyWidth - 8}v7q-${bodyWidth / 2 - 4} 3 -${bodyWidth - 8} 0Z" fill="#b8d8ee" opacity=".9"/><path d="M${left} 8h3v6h-3Zm${bodyWidth} 0h3v6h-3Zm-3 13h3v6h-3Zm${bodyWidth} 0h3v6h-3Z" fill="#111827"/>`;
+      return `<div class="mk mk-driver ${m.idle ? "mk-driver-idle" : ""}" title="${title}"><div style="transform:rotate(${m.heading ?? 0}deg);width:30px;height:30px"><svg viewBox="0 0 36 36" width="30" height="30" aria-hidden="true">${svg}</svg></div></div>`;
+    }
     case "pickup":
       return `<div class="mk mk-pickup" title="${m.title ?? "Pickup"}"></div>`;
     case "destination":

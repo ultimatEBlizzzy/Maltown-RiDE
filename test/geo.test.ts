@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bearingDeg, boundingBox, haversineKm, isValidLatLng, moveTowards } from "../src/lib/geo";
+import { advanceAlongPolyline, bearingDeg, boundingBox, haversineKm, isValidLatLng, moveTowards, nearestPolylineIndex } from "../src/lib/geo";
 
 describe("geo utilities", () => {
   const malamulele = { lat: -23.002718, lng: 30.6946597 };
@@ -34,6 +34,25 @@ describe("geo utilities", () => {
     const after = haversineKm(next, xigalo);
     expect(after).toBeLessThan(before);
     expect(before - after).toBeLessThanOrEqual(2.001);
+  });
+
+  it("advances along a bent road polyline instead of cutting diagonally", () => {
+    const route = [
+      { lat: 0, lng: 0 },
+      { lat: 0, lng: 0.01 },
+      { lat: 0.01, lng: 0.01 },
+    ];
+    const advanced = advanceAlongPolyline(route, 0, 1.3);
+    expect(advanced).not.toBeNull();
+    expect(advanced?.position.lng).toBeCloseTo(0.01, 5);
+    expect(advanced?.position.lat).toBeGreaterThan(0);
+    expect(advanced?.position.lat).toBeLessThan(0.01);
+    expect(advanced?.heading).toBeLessThan(2);
+  });
+
+  it("resumes at the closest point on a route", () => {
+    const route = [{ lat: 0, lng: 0 }, { lat: 0, lng: 0.01 }, { lat: 0.01, lng: 0.01 }];
+    expect(nearestPolylineIndex({ lat: 0.009, lng: 0.01 }, route)).toBe(2);
   });
 
   it("bearing is ~north for a destination due north", () => {

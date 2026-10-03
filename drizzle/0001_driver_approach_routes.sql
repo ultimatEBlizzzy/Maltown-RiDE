@@ -1,0 +1,1 @@
+ALTER TABLE "rides" ADD COLUMN "approach_route_line" jsonb;

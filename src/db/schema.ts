@@ -162,6 +162,7 @@ export const rides = pgTable(
     finalFare: numeric("final_fare", { precision: 12, scale: 2, mode: "number" }),
     status: rideStatusEnum("status").notNull().default("REQUESTED"),
     routeLine: jsonb("route_line").$type<[number, number][]>(),
+    approachRouteLine: jsonb("approach_route_line").$type<[number, number][]>(),
     requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
     startedAt: timestamp("started_at", { withTimezone: true }),

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui";
 import { usePoll } from "@/hooks/usePoll";
 import { useUser } from "@/hooks/useUser";
+import { useVehicleImage } from "@/hooks/useVehicleImage";
 import { api } from "@/lib/api-client";
 import { bearingDeg } from "@/lib/geo";
 import { MARKET_CENTER, MARKET_LANDMARKS } from "@/lib/market";
@@ -33,6 +34,7 @@ import {
   type PaymentMethod,
   type RideDto,
   type UserDto,
+  type VehicleDto,
   type VehicleClassId,
 } from "@/lib/types";
 
@@ -47,6 +49,8 @@ type MapMarkerSpec = {
   kind: "driver" | "pickup" | "destination" | "user";
   heading?: number;
   idle?: boolean;
+  vehicle?: VehicleDto;
+  vehicleImageUrl?: string;
 };
 
 const FALLBACK_CENTER: GeoPoint = MARKET_CENTER;
@@ -93,6 +97,7 @@ function RiderApp({ user }: { user: UserDto }) {
   const rideRef = useRef(ride);
   rideRef.current = ride;
   const lastDriverPos = useRef<LatLng | null>(null);
+  const movingVehiclePhoto = useVehicleImage(ride?.driver?.vehicle?.make, ride?.driver?.vehicle?.model);
 
   const stage: Stage = useMemo(() => {
     if (ride) {
@@ -299,7 +304,7 @@ function RiderApp({ user }: { user: UserDto }) {
     const list: MapMarkerSpec[] = [];
     if (stage === "plan" || stage === "estimate" || stage === "searching") {
       for (const d of nearby) {
-        list.push({ id: `nb-${d.userId}`, lat: d.lat, lng: d.lng, kind: "driver", idle: true, heading: 0 });
+        list.push({ id: `nb-${d.userId}`, lat: d.lat, lng: d.lng, kind: "driver", idle: true, heading: 0, vehicle: d.vehicle });
       }
     }
     if (pickup) list.push({ id: "pickup", lat: pickup.lat, lng: pickup.lng, kind: "pickup", heading: 0 });
@@ -307,10 +312,10 @@ function RiderApp({ user }: { user: UserDto }) {
     if (ride?.driverLocation) {
       const prev = lastDriverPos.current;
       const heading = prev ? bearingDeg(prev, { lat: ride.driverLocation.lat, lng: ride.driverLocation.lng }) : 0;
-      list.push({ id: "driver", lat: ride.driverLocation.lat, lng: ride.driverLocation.lng, kind: "driver", heading });
+      list.push({ id: "driver", lat: ride.driverLocation.lat, lng: ride.driverLocation.lng, kind: "driver", heading, vehicle: ride.driver?.vehicle, vehicleImageUrl: movingVehiclePhoto?.url });
     }
     return list;
-  }, [nearby, pickup, dest, ride, stage]);
+  }, [nearby, pickup, dest, ride, stage, movingVehiclePhoto]);
 
   const fitKey = `${stage}:${ride?.id ?? ""}`;
   const progressStep = ride ? STATUS_META[ride.status].step : 0;
@@ -324,7 +329,7 @@ function RiderApp({ user }: { user: UserDto }) {
         <MapView
           center={pickup ?? FALLBACK_CENTER}
           markers={markers}
-          route={ride?.routeLine ?? null}
+          route={ride ? (ride.status === "IN_PROGRESS" ? ride.routeLine : ride.approachRouteLine) : null}
           onMapClick={handleMapClick}
           fitKey={fitKey}
         />

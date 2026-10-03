@@ -118,6 +118,7 @@ export interface RideDto {
   driver: DriverInfoDto | null;
   driverLocation: (LatLng & { updatedAt: string }) | null;
   routeLine: [number, number][] | null;
+  approachRouteLine: [number, number][] | null;
   payment: PaymentDto | null;
   rating: RatingDto | null;
 }
